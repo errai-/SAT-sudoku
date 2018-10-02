@@ -17,10 +17,11 @@ using std::stoi;
 
 enum tribool { tru, fls, mbe };
 
+// The class of conditions
 class Cond {
 public:
     ~Cond() {}
-    Cond(const string &c, vector<tribool> *v) { mCond = c; mVals = v; mStat = mbe; mUnk = 100; if (!Parse()) mStat = fls; }
+    Cond(const string &c) { mCond = c; mStat = mbe; mUnk = 100; if (!Parse()) mStat = fls; }
     void PrintCond() const {
         if (mStat != mbe) {
             if (mStat==tru) cout << "t" << endl;
@@ -34,7 +35,7 @@ public:
         }
         cout << " s:" << Status() << " u:" << Unknowns() << endl;
     }
-    bool Update();
+    bool Update(vector<tribool> &vals);
     const tribool Status() const { return mStat; }
     const int Unknowns() const { return mUnk; }
 private:
@@ -56,18 +57,18 @@ private:
         }
     }
     string mCond;
-    vector<tribool> *mVals;
     tribool mStat;
     int mUnk;
     vector<string> mTruths;
     vector<string> mDelims;
 };
 
+// The class holding a single set of triboolean values and their conditions
 struct Tribools {
     vector<tribool> mVals;
     vector<Cond> mConds;
     bool AddCond(string cond) {
-        mConds.push_back(Cond(cond,&mVals));
+        mConds.push_back(Cond(cond));
         return true;
     }
     void PrintConds() {
@@ -76,7 +77,7 @@ struct Tribools {
     }
     bool Updates() {
         for (auto &c : mConds)
-            c.Update();
+            c.Update(mVals);
         return CheckConds();
     }
     bool CheckConds() {
@@ -100,7 +101,8 @@ public:
     SudoHold() {}
     ~SudoHold() {}
 
-    bool ReadSudo(string fname);
+    bool ReadSudos(string fname);
+    bool SolveSudos();
     void PrintSudo(int idx);
 private:
     vector<Tribools> mSudos;

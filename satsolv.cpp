@@ -20,7 +20,7 @@ bool Cond::Parse() {
     return (mTruths.size()==mDelims.size()+1);
 }
 
-bool Cond::Update() {
+bool Cond::Update(vector<tribool> &vals) {
     if (mStat!=mbe) return false;
     if (mTruths.size()!=mDelims.size()+1) return false;
     tribool valprev = mbe;
@@ -34,7 +34,7 @@ bool Cond::Update() {
         } else {
             unsigned pos = stoi(currs.substr(1));
             bool reverse = (currs[0]=='n');
-            valprev = mVals->at(pos);
+            valprev = vals.at(pos);
 
             if (valprev == tru) { if (reverse) valprev = fls; }
             else if (valprev == fls) { if (reverse) valprev = tru; }
@@ -57,7 +57,7 @@ bool Cond::Update() {
         } else {
             unsigned pos = stoi(curris.substr(1));
             bool reverse = (curris[0]=='n');
-            val = mVals->at(pos);
+            val = vals.at(pos);
 
             if (val == tru) { if (reverse) val = fls; }
             else if (val == fls) { if (reverse) val = tru; }
@@ -142,26 +142,28 @@ bool Cond::Update() {
     } else if (mUnk==1) {
         unsigned pos = stoi(mTruths[0].substr(1));
         bool reverse = (mTruths[0][0]=='n');
-        if (reverse) mVals->at(pos) = fls;
-        else mVals->at(pos) = tru;
+        if (reverse) vals.at(pos) = fls;
+        else vals.at(pos) = tru;
         mStat = tru;
     }
 
     return true;
 }
 
-bool SudoHold::ReadSudo(string fname) {
+bool SudoHold::ReadSudos(string fname) {
     std::ifstream ifile(fname);
     regex grd("^Grid ([0-9]+)");
     regex lne("^([0-9]{9})");
     std::smatch match;
     if (ifile.is_open()) {
         string line;
+        // Loop over potential "starter lines" in file
         while (getline(ifile,line)) {
+            // Does the "starter line" match our expectations?
             if (std::regex_search(line,match,grd)) {
                 mSudos.push_back(Tribools());
                 mTags.push_back(std::stoi(match[1]));
-                // Loop over rows
+                // Loop over nine rows to add a single sudoku to the boolean grid
                 for (int l = 0; l<9; ++l) {
                     if (getline(ifile,line) and std::regex_search(line,match,lne)) {
                         // Loop over columns
@@ -180,7 +182,9 @@ bool SudoHold::ReadSudo(string fname) {
                         return false;
                     }
                 }
-                // Loop over all cells: set conditions so that exactly one number is true in one cell
+
+                // This is a sudoku, so in the next few moments we add the conditions necessary to a sudoku:
+                // 1. Loop over all cells: set conditions so that exactly one number is true in one cell
                 for (int row = 0; row < 9; ++row) {
                     for (int col = 0; col < 9; ++col) {
                         int currpos = 81*row+9*col;
@@ -198,8 +202,9 @@ bool SudoHold::ReadSudo(string fname) {
                             }
                         }
                     }
-                }
-                // Loop over all rows: set conditions so that each number is present exactly once in a row
+                } // 1. Cell loop
+
+                // 2. Loop over all rows: set conditions so that each number is present exactly once in a row
                 for (int row = 0; row < 9; ++row) {
                     // Loop over all numbers
                     for (int no = 0; no < 9; ++no) {
@@ -218,8 +223,9 @@ bool SudoHold::ReadSudo(string fname) {
                             }
                         }
                     }
-                }
-                // Loopover all cols: set conditions so that each number is present exactly once in a column
+                } // 2. Row loop
+
+                // 3. Loop over all cols: set conditions so that each number is present exactly once in a column
                 for (int col = 0; col < 9; ++col) {
                     // Loop over all numbers
                     for (int no = 0; no < 9; ++no) {
@@ -238,8 +244,9 @@ bool SudoHold::ReadSudo(string fname) {
                             }
                         }
                     }
-                }
-                // This is the best part of the trip: loop over the 9 squares
+                } // 3. Column loop
+
+                // 4. This is the best part of the trip: loop over the 9 squares so that each number is present exactly once in a square
                 for (int cpos = 0; cpos < 3; ++cpos) {
                 for (int rpos = 0; rpos < 3; ++rpos) {
                     int lcorner = 9*3*cpos+81*3*rpos;
@@ -264,16 +271,9 @@ bool SudoHold::ReadSudo(string fname) {
                             }
                         }
                     }
-                }}
-                cout << endl;
-                for (int iter = 0; iter<100; ++iter) {
-                    cout << mSudos.back().Updates() << " " << mSudos.back().mConds.size() << endl;
-                    if (mSudos.back().mConds.size()==0) break;
-                }
-                mSudos.back().PrintConds();
-                PrintSudo(mSudos.size()-1);
-            }
-        }
+                }} // 4. Square loop
+            } // Does the "starter line" match our expectations?
+        } // Loop over potential "starter lines" in file
     } else {
         return false;
     }
@@ -281,19 +281,53 @@ bool SudoHold::ReadSudo(string fname) {
     return true;
 }
 
+bool SudoHold::SolveSudos() {
+    if (mTags.size()!=mSudos.size()) return false;
+
+    unsigned success = 0;
+    for (auto idx = 0u; idx < mSudos.size(); ++idx) {
+        auto &sudo = mSudos[idx];
+        cout << endl;
+        unsigned prevconds = sudo.mConds.size();
+        for (int iter = 0; iter<100; ++iter) {
+            cout << sudo.Updates() << " " << sudo.mConds.size() << endl;
+            // Stop when there are no more conditions to monitor
+            if (sudo.mConds.size()==0) break;
+            // Stop also when there are redundant steps
+            if (sudo.mConds.size()==prevconds) break;
+            prevconds = sudo.mConds.size();
+        }
+        //if (sudo.mConds.size()>0) sudo.PrintConds();
+        PrintSudo(idx);
+        if (sudo.mConds.size()==0) ++success;
+    }
+    cout << "Out of the " << mSudos.size() << " sudokus, " << success << " were solved successfully!" << endl;
+
+    return true;
+}
+
 void SudoHold::PrintSudo(int idx) {
     if (idx < mSudos.size() and idx < mTags.size()) {
-        cout << endl << "Printing grid " << mTags[idx] << endl;
+        cout << endl << "Printing grid " << mTags[idx] << ":" << endl;
+        cout << "=================" << endl << endl;
         int counter = 0;
         int currval = 0;
         int rowidx = 0;
+        int rowcount = 0;
         for (auto &val : mSudos[idx].mVals) {
+            // Go through the nine boolean values per cell
             if (++counter>9) {
+                // Go through the nine cells on a row
                 if (++rowidx>9) {
+                    // Induce a row change
                     cout << endl;
                     rowidx = 1;
+                    if (++rowcount%3==0)
+                        cout << "===============" << endl;
                 }
-                cout << currval;
+                if (rowidx>1 and rowidx%3==1) cout << " | ";
+                if (currval!=0) cout << currval;
+                else cout << " ";
                 counter = 1;
                 currval = 0;
             }
@@ -301,14 +335,16 @@ void SudoHold::PrintSudo(int idx) {
                 currval = counter;
             }
         }
-        cout << currval << endl;
+        if (currval!=0) cout << currval << endl;
+        else cout << " " << endl;
     }
 }
 
 int main(void) {
     try {
         SudoHold sudoHolder;
-        if (!sudoHolder.ReadSudo("p096_sudoku.txt")) return 1;
+        if (!sudoHolder.ReadSudos("p096_sudoku.txt")) return 1;
+        if (!sudoHolder.SolveSudos()) return 1;
     } catch (std::regex_error &e) {
         cout << e.what() << " " << e.code() << endl;
     } catch (std::exception &e) {
