@@ -3,11 +3,15 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <map>
 #include <fstream>
 #include <sstream>
 #include <regex>
+#include <algorithm>
 
+using std::pair;
 using std::vector;
+using std::map;
 using std::cout;
 using std::endl;
 using std::string;
@@ -20,21 +24,13 @@ enum tribool { tru, fls, mbe };
 // The class of conditions
 class Cond {
 public:
-    ~Cond() {}
     Cond(const string &c) { mCond = c; mStat = mbe; mUnk = 100; if (!Parse()) mStat = fls; }
-    void PrintCond() const {
-        if (mStat != mbe) {
-            if (mStat==tru) cout << "t" << endl;
-            else cout << "f" << endl;
-            return;
-        }
-        cout << mTruths[0];
-        for (auto i = 0u; i < mDelims.size(); ++i) {
-            cout << " " << mDelims[i];
-            cout << " " << mTruths[i+1];
-        }
-        cout << " s:" << Status() << " u:" << Unknowns() << endl;
-    }
+    Cond(const Cond &c) { mCond = c.mCond; mStat = c.mStat; mUnk = c.mUnk; mTruths = c.mTruths; }
+    ~Cond() {}
+
+    void PrintCond() const { cout << mCond << " s:" << Status() << " u:" << Unknowns() << endl; }
+    string &GetCond() { return mCond; }
+    vector<string> &GetTruths() { return mTruths; }
     bool Update(vector<tribool> &vals);
     const tribool Status() const { return mStat; }
     const int Unknowns() const { return mUnk; }
@@ -60,13 +56,47 @@ private:
     tribool mStat;
     int mUnk;
     vector<string> mTruths;
-    vector<string> mDelims;
+};
+
+struct Triplet {
+    Triplet() {
+        v1 = 0; v2 = 0; v3 = 0;
+    }
+    Triplet(int _v1, int _v2, int _v3) {
+        v1 = _v1; v2 = _v2; v3 = _v3;
+    }
+    bool operator > (const Triplet& tri) const {
+        int m1 = std::min(v2,v3);
+        int m2 = std::min(tri.v2,tri.v3);
+        if (m1==m2) {
+            return std::max(v2,v3)>std::max(tri.v2,tri.v3);
+        } else {
+            return (m1>m2);
+        }
+    }
+    int v1;
+    int v2;
+    int v3;
 };
 
 // The class holding a single set of triboolean values and their conditions
-struct Tribools {
+class Tribools {
+public:
+    Tribools() {};
+    Tribools(const Tribools &tbs) {
+        mVals = tbs.mVals;
+        mConds = tbs.mConds;
+    }
+    ~Tribools() {};
+    Tribools& operator=(const Tribools& tbs) {
+        mVals = tbs.mVals;
+        mConds = tbs.mConds;
+        return *this;
+    }
+
     vector<tribool> mVals;
     vector<Cond> mConds;
+
     bool AddCond(string cond) {
         mConds.push_back(Cond(cond));
         return true;
@@ -75,24 +105,38 @@ struct Tribools {
         for (auto &c : mConds)
             c.PrintCond();
     }
+    void Print2Conds() {
+        for (auto &c : mConds)
+            if (c.Unknowns()<=2) c.PrintCond();
+    }
+    bool Solve();
+private:
+    map<string,vector<string> > mAssoc;
+    vector<Triplet> mPotentials;
+
+    bool CheckConds();
+    bool EraseDuplicates();
+    bool FindAttempts();
+    bool FindComplements();
+    bool FindPairings();
+    bool LoopAttempts();
+    bool RemoveNonDual();
+
+    bool Method1() {
+        if (!FindPairings()) return false;
+        if (!RemoveNonDual()) return false;
+        if (!FindComplements()) return false;
+        return true;
+    }
+    bool Method2() {
+        if (!FindAttempts()) return false;
+        if (!LoopAttempts()) return false;
+        return true;
+    }
     bool Updates() {
         for (auto &c : mConds)
-            c.Update(mVals);
+            if (!c.Update(mVals)) return false;
         return CheckConds();
-    }
-    bool CheckConds() {
-        bool success = true;
-        for (auto i = 0u; i<mConds.size();) {
-            if (mConds[i].Status()==tru) {
-                mConds.erase(mConds.begin()+i);
-            } else if (mConds[i].Status()==fls) {
-                mConds.erase(mConds.begin()+i);
-                success = false;
-            } else {
-                i += 1;
-            }
-        }
-        return success;
     }
 };
 

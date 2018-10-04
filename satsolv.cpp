@@ -1,130 +1,92 @@
 #include "satsolv.h"
 
+//////////////////
+// Cond functions:
+//////////////////
+
 bool Cond::Parse() {
     mTruths.clear();
-    mDelims.clear();
     string curr;
     for (char &c : mCond) {
         if (c != ' ')
             curr += c;
         else {
-            if (curr=="V" or curr=="A")
-                mDelims.push_back(curr);
-            else {
-                mTruths.push_back(curr);
-            }
+            if (curr!="V" and curr!="A") mTruths.push_back(curr);
             curr = "";
         }
     }
     mTruths.push_back(curr);
-    return (mTruths.size()==mDelims.size()+1);
+
+    return true;
 }
 
 bool Cond::Update(vector<tribool> &vals) {
     if (mStat!=mbe) return false;
-    if (mTruths.size()!=mDelims.size()+1) return false;
-    tribool valprev = mbe;
 
-    {
-        string &currs = mTruths[0];
+    // We proceed from left to right, eliminating "from left".
+    // In the process, possible updates are taken into account
+    tribool valprev = mbe;
+    for (auto idx = 0u; idx < mTruths.size();) {
+        tribool val = mbe;
+
+        string &currs = mTruths[idx];
         if (currs=="t") {
-            valprev = tru;
+            val = tru;
         } else if (currs=="f") {
-            valprev = fls;
+            val = fls;
         } else {
             unsigned pos = stoi(currs.substr(1));
             bool reverse = (currs[0]=='n');
-            valprev = vals.at(pos);
-
-            if (valprev == tru) { if (reverse) valprev = fls; }
-            else if (valprev == fls) { if (reverse) valprev = tru; }
-            if (valprev==tru) currs = "t";
-            else if (valprev==fls) currs = "f";
-        }
-    }
-
-    // We proceed from left to right, eliminating "from left"
-    for (auto i = 0u; i < mDelims.size();) {
-        string &d = mDelims[i];
-        auto idx = i+1;
-        tribool val = mbe;
-
-        string &curris = mTruths[idx];
-        if (curris=="t") {
-            val = tru;
-        } else if (curris=="f") {
-            val = fls;
-        } else {
-            unsigned pos = stoi(curris.substr(1));
-            bool reverse = (curris[0]=='n');
             val = vals.at(pos);
 
             if (val == tru) { if (reverse) val = fls; }
             else if (val == fls) { if (reverse) val = tru; }
-            if (val==tru) curris = "t";
-            else if (val==fls) curris = "f";
+            if (val==tru) currs = "t";
+            else if (val==fls) currs = "f";
         }
 
-        // The previous value is exact, so we can retract
-        if (valprev != mbe) {
-            // One element removed, nothing changes for i
-            tribool method = Eval(valprev,val,d);
+        if (valprev == mbe) {
+            // Previous value not exact, so nothing to retract
+            ++idx;
+            valprev = val;
+        } else {
+            // The previous value is exact, so we can retract
+            tribool method = Eval(valprev,val,"V");
             if (method==tru) { mTruths[idx] = "t"; }
             else if (method==fls) { mTruths[idx] = "f"; }
-            // We remove the current delimeter and the previous position
-            mTruths.erase(mTruths.begin()+i);
-            mDelims.erase(mDelims.begin()+i);
+            // We remove the previous position, so idx remains static
+            mTruths.erase(mTruths.begin()+idx-1);
             valprev = method;
-        } else {
-            // Both values are maybe, nothing to be done
-            i += 1;
-            valprev = val;
         }
     }
 
-    if (mTruths.size()!=mDelims.size()+1) return false;
-
-    {
-        string &currs = mTruths.back();
-        if (currs=="t") {
-            valprev = tru;
-        } else if (currs=="f") {
-            valprev = fls;
-        } else {
-            valprev = mbe;
-        }
-    }
-
-    // We proceed from left to right, eliminating "from left"
-    for (auto i = mDelims.size(); i > 0;) {
-        int idx = i-1;
-        string &d = mDelims[idx];
+    // We proceed from left to right, eliminating "from left".
+    // No need to update the cell values this time.
+    valprev = mbe;
+    for (int idx = mTruths.size()-1; idx >= 0; --idx) {
         tribool val = mbe;
 
-        string &curris = mTruths[idx];
-        if (curris=="t") {
+        string &currs = mTruths[idx];
+        if (currs=="t") {
             val = tru;
-        } else if (curris=="f") {
+        } else if (currs=="f") {
             val = fls;
         } else {
             val = mbe;
         }
 
-        // The previous value is exact, so we can retract
-        if (valprev != mbe) {
-            // One element removed, so we need to make i smaller
-            tribool method = Eval(valprev,val,d);
+        if (valprev == mbe) {
+            // Previous value not exact, so nothing to retract
+            valprev = val;
+        } else {
+            // The previous value is exact, so we can retract
+            tribool method = Eval(valprev,val,"V");
             if (method==tru) { mTruths[idx] = "t"; }
             else if (method==fls) { mTruths[idx] = "f"; }
-            // We remove the current delimeter and the previous position
-            mTruths.erase(mTruths.begin()+i);
-            mDelims.erase(mDelims.begin()+idx);
+            // We remove the previous position
+            mTruths.erase(mTruths.begin()+idx+1);
             valprev = method;
-        } else {
-            // Both values are maybe, nothing to be done
-            valprev = val;
         }
-        i -= 1;
     }
 
     // Count the unknowns
@@ -135,8 +97,10 @@ bool Cond::Update(vector<tribool> &vals) {
     if (mUnk==0) {
         if (mTruths[0]=="t") {
             mStat = tru;
+            mCond = "t";
         } else {
             mStat = fls;
+            mCond = "f";
             return false;
         }
     } else if (mUnk==1) {
@@ -145,10 +109,217 @@ bool Cond::Update(vector<tribool> &vals) {
         if (reverse) vals.at(pos) = fls;
         else vals.at(pos) = tru;
         mStat = tru;
+        mCond = "t";
+    } else {
+        mCond = mTruths[0];
+        for (auto i = 1u; i < mTruths.size(); ++i) {
+            mCond += " V ";
+            mCond += mTruths[i];
+        }
     }
 
     return true;
 }
+
+//////////////////////
+// Tribools functions:
+//////////////////////
+
+bool Tribools::CheckConds() {
+    bool success = true;
+    for (auto i = 0u; i<mConds.size();) {
+        if (mConds[i].Status()==tru) {
+            mConds.erase(mConds.begin()+i);
+        } else if (mConds[i].Status()==fls) {
+            mConds.erase(mConds.begin()+i);
+            success = false;
+        } else {
+            i += 1;
+        }
+    }
+    return success;
+}
+
+bool Tribools::EraseDuplicates() {
+    for (auto i = 0u; i<mConds.size()-1; ++i) {
+        string &first = mConds[i].GetCond();
+        for (auto j = i+1; j<mConds.size();) {
+            string &second = mConds[j].GetCond();
+            if (first==second) { mConds.erase(mConds.begin()+j); }
+            else ++j;
+        }
+    }
+    return true;
+}
+
+bool Tribools::FindAttempts() {
+    map<int,pair<int,int>> numbers;
+    for (auto &c : mConds) {
+        if (c.Unknowns()!=2) continue;
+        auto &ts = c.GetTruths();
+        if (ts.size()!=2) {
+            cout << "Problems in the condition class!" << endl;
+            continue;
+        }
+        for (int i = 0; i<2; ++i) {
+            string &ti = ts[i];
+            int idx = stoi(ti.substr(1));
+            if (numbers.find(idx)==numbers.end()) numbers[idx] = std::make_pair(0,0);
+            if (ti[0]=='y') numbers[idx].first += 1;
+            else numbers[idx].second += 1;
+        }
+    }
+    mPotentials.clear();
+    for (auto &val : numbers) {
+        if (val.second.first == 0 or val.second.second == 0) continue;
+        mPotentials.emplace_back(val.first,val.second.first,val.second.second);
+    }
+
+    std::sort(mPotentials.begin(),mPotentials.end(),std::greater<Triplet>());
+    return true;
+}
+
+bool Tribools::FindComplements() {
+    for (auto &c : mConds) {
+        if (c.Unknowns()!=2) continue;
+        auto &ts = c.GetTruths();
+        if (ts.size()!=2) {
+            cout << "Problems in the condition class!" << endl;
+            continue;
+        }
+        // The original two conditions
+        string &t1 = ts[0];
+        string &t2 = ts[1];
+        // We build complementary conditions
+        string ct1 = (t1[0]=='y' ? "n" : "y");
+        string ct2 = (t2[0]=='y' ? "n" : "y");
+        ct1 += t1.substr(1);
+        ct2 += t2.substr(1);
+        // We go through the found pairings in search of the two conditions
+        for (auto &ass : mAssoc) {
+            auto &cands = ass.second;
+            if (std::find(cands.begin(),cands.end(),ct1)==cands.end()) continue;
+            if (std::find(cands.begin(),cands.end(),ct2)==cands.end()) continue;
+            int idx = stoi(ass.first.substr(1));
+            if (ass.first[0]=='y') mVals[idx] = tru;
+            else mVals[idx] = fls;
+        }
+    }
+    return true;
+}
+
+bool Tribools::FindPairings() {
+    mAssoc.clear();
+    for (auto &c : mConds) {
+        if (c.Unknowns()!=2) continue;
+        auto &ts = c.GetTruths();
+        if (ts.size()!=2) {
+            cout << "Problems in the condition class!" << endl;
+            continue;
+        }
+        for (auto j = 0u; j<2; ++j) {
+            auto jc = (j==0 ? 1 : 0);
+            if (mAssoc.find(ts[j])==mAssoc.end()) mAssoc[ts[j]] = vector<string>();
+            mAssoc[ts[j]].push_back(ts[jc]);
+        }
+    }
+    return true;
+}
+
+bool Tribools::LoopAttempts() {
+    // We need to do this, until we find some triggering value
+    for (auto &p : mPotentials) {
+        int idx = p.v1;
+        Tribools try1(*this);
+        Tribools try2(*this);
+        try1.mVals[idx] = tru;
+        try2.mVals[idx] = fls;
+
+        bool g1 = try1.Solve();
+        bool g2 = try2.Solve();
+
+        // This was undecisive
+        cout << endl << g1 << " " << g2 << endl << endl;
+        if (g1 and g2) {
+            continue;
+        } else if (g1) {
+            *this = try1;
+            break;
+        } else if (g2) {
+            *this = try2;
+            break;
+        } else {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool Tribools::RemoveNonDual() {
+    auto iter = mAssoc.begin();
+    auto endIter = mAssoc.end();
+    for(; iter != endIter; ) {
+        if (iter->second.size()<2) mAssoc.erase(iter++);
+        else ++iter;
+    }
+    return true;
+}
+
+bool Tribools::Solve() {
+    int despairLvl = 0;
+    unsigned prevconds = mConds.size();
+    cout << endl << "s " << prevconds << endl;
+    EraseDuplicates();
+    prevconds = mConds.size();
+    bool goodness = true;
+    for (int iter = 0; iter<100; ++iter) {
+        if (!Updates()) {
+            goodness = false;
+            break;
+        }
+        cout << "i " << prevconds << endl;
+        unsigned conds = mConds.size();
+        // Stop when there are no more conditions to monitor
+        if (conds==0) break;
+        // If there is a redundant step, we try to use special measures
+        if (conds==prevconds) {
+            if (despairLvl==0) {
+                ++despairLvl;
+                // Start with cleaning up the "extra" conditions
+                EraseDuplicates();
+                conds = mConds.size();
+                // Method 1 : we eliminate "violating triplet conditions"
+                cout << "Retrying method 1: " << endl;
+                if (!Method1()) {
+                    goodness = false;
+                    break;
+                }
+            } else if (despairLvl==1) {
+                ++despairLvl;
+                // Method 2 : make an educated guess
+                cout << "Retrying method 2: " << endl;
+                if (!Method2()) {
+                    goodness = false;
+                    break;
+                }
+                conds = mConds.size();
+            } else {
+                // Getting too desperate, this needs to stop
+                goodness = false;
+                break;
+            }
+        } else if (despairLvl>0) {
+            // Despair levels normalizing
+            despairLvl = 0;
+        }
+        prevconds = conds;
+    }
+    return goodness;
+}
+
+//////////////////////
+// SudoHold functions:
+//////////////////////
 
 bool SudoHold::ReadSudos(string fname) {
     std::ifstream ifile(fname);
@@ -161,8 +332,10 @@ bool SudoHold::ReadSudos(string fname) {
         while (getline(ifile,line)) {
             // Does the "starter line" match our expectations?
             if (std::regex_search(line,match,grd)) {
+                // Add a skeleton tribool structure and the index of the current sudoku to the corresponding vectors
                 mSudos.push_back(Tribools());
                 mTags.push_back(std::stoi(match[1]));
+
                 // Loop over nine rows to add a single sudoku to the boolean grid
                 for (int l = 0; l<9; ++l) {
                     if (getline(ifile,line) and std::regex_search(line,match,lne)) {
@@ -184,7 +357,8 @@ bool SudoHold::ReadSudos(string fname) {
                 }
 
                 // This is a sudoku, so in the next few moments we add the conditions necessary to a sudoku:
-                // 1. Loop over all cells: set conditions so that exactly one number is true in one cell
+                //
+                //{ 1. Loop over all cells: set conditions so that exactly one number is true in one cell
                 for (int row = 0; row < 9; ++row) {
                     for (int col = 0; col < 9; ++col) {
                         int currpos = 81*row+9*col;
@@ -202,9 +376,10 @@ bool SudoHold::ReadSudos(string fname) {
                             }
                         }
                     }
-                } // 1. Cell loop
-
-                // 2. Loop over all rows: set conditions so that each number is present exactly once in a row
+                }
+                //} 1. Cell loop
+                //
+                //{ 2. Loop over all rows: set conditions so that each number is present exactly once in a row
                 for (int row = 0; row < 9; ++row) {
                     // Loop over all numbers
                     for (int no = 0; no < 9; ++no) {
@@ -223,9 +398,10 @@ bool SudoHold::ReadSudos(string fname) {
                             }
                         }
                     }
-                } // 2. Row loop
-
-                // 3. Loop over all cols: set conditions so that each number is present exactly once in a column
+                }
+                //} 2. Row loop
+                //
+                //{ 3. Loop over all cols: set conditions so that each number is present exactly once in a column
                 for (int col = 0; col < 9; ++col) {
                     // Loop over all numbers
                     for (int no = 0; no < 9; ++no) {
@@ -244,9 +420,10 @@ bool SudoHold::ReadSudos(string fname) {
                             }
                         }
                     }
-                } // 3. Column loop
-
-                // 4. This is the best part of the trip: loop over the 9 squares so that each number is present exactly once in a square
+                }
+                //} 3. Column loop
+                //
+                //{ 4. This is the best part of the trip: loop over the 9 squares so that each number is present exactly once in a square
                 for (int cpos = 0; cpos < 3; ++cpos) {
                 for (int rpos = 0; rpos < 3; ++rpos) {
                     int lcorner = 9*3*cpos+81*3*rpos;
@@ -271,7 +448,8 @@ bool SudoHold::ReadSudos(string fname) {
                             }
                         }
                     }
-                }} // 4. Square loop
+                }}
+                //} 4. Square loop
             } // Does the "starter line" match our expectations?
         } // Loop over potential "starter lines" in file
     } else {
@@ -287,19 +465,14 @@ bool SudoHold::SolveSudos() {
     unsigned success = 0;
     for (auto idx = 0u; idx < mSudos.size(); ++idx) {
         auto &sudo = mSudos[idx];
-        cout << endl;
-        unsigned prevconds = sudo.mConds.size();
-        for (int iter = 0; iter<100; ++iter) {
-            cout << sudo.Updates() << " " << sudo.mConds.size() << endl;
-            // Stop when there are no more conditions to monitor
-            if (sudo.mConds.size()==0) break;
-            // Stop also when there are redundant steps
-            if (sudo.mConds.size()==prevconds) break;
-            prevconds = sudo.mConds.size();
+
+        if (sudo.Solve()) {
+            PrintSudo(idx);
+            if (sudo.mConds.size()==0) ++success;
+            //else sudo.Print2Conds();
+        } else {
+            cout << "At idx " << idx << endl;
         }
-        //if (sudo.mConds.size()>0) sudo.PrintConds();
-        PrintSudo(idx);
-        if (sudo.mConds.size()==0) ++success;
     }
     cout << "Out of the " << mSudos.size() << " sudokus, " << success << " were solved successfully!" << endl;
 
@@ -339,6 +512,10 @@ void SudoHold::PrintSudo(int idx) {
         else cout << " " << endl;
     }
 }
+
+////////
+// main:
+////////
 
 int main(void) {
     try {
