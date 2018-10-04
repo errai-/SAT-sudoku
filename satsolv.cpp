@@ -283,11 +283,11 @@ bool Tribools::Solve() {
         if (conds==0) break;
         // If there is a redundant step, we try to use special measures
         if (conds==prevconds) {
+            // Start with cleaning up the "extra" conditions
+            EraseDuplicates();
+            conds = mConds.size();
             if (despairLvl==0) {
                 ++despairLvl;
-                // Start with cleaning up the "extra" conditions
-                EraseDuplicates();
-                conds = mConds.size();
                 // Method 1 : we eliminate "violating triplet conditions"
                 cout << "Retrying method 1: " << endl;
                 if (!Method1()) {
@@ -305,6 +305,10 @@ bool Tribools::Solve() {
                 conds = mConds.size();
             } else {
                 // Getting too desperate, this needs to stop
+                // TODO: we could implement a method that uses
+                // general guessing (i.e. not only conditions of
+                // variables). This could be useful for non-sudoku
+                // purposes.
                 goodness = false;
                 break;
             }
