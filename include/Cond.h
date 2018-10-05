@@ -43,4 +43,4 @@ private:
     vector<string> mTruths;
 };
 
-#endif
+#endif // CONDS

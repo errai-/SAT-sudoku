@@ -21,13 +21,14 @@ only include "or" conditions. Therefore, in a single condition (the "cond" class
 we only operate on lists of boolean values that are implicitly bonded by "or"s.
 The or sign ("V") is typically only printed to give the viewer visual pleasure.
 
-The specific issue of solving sudoku's is performed within the class SudoHold.
+The specific issue of solving sudoku's is performed via the interface of the class SudoHold.
 The most important thing this class does, is that it sets up a Tribools object
 containing 829 triboolean values. Each consecutive set of nine tribooleans tell the boolean
 truth of numbers 1-9 residing within the current cell. Neighboring ninelets of tribooleans
 describe the neighboring columns  Furthermore, it asserts the necessary conditions
 for a sudoku to happen: in each cell we have exactly one number of the nine,
-on each row, column and 3x3 square we have all the number 1-9.
+on each row, column and 3x3 square we have all the number 1-9. Moreover, the SudoHold
+class asserts all the conditions required by a sudoku.
 
 All the four types of conditions are given in the format "exactly on of nine boolean
 values is true". For the sake of an example, let us consider the nine tribooleans 1-9.

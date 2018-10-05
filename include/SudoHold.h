@@ -1,4 +1,7 @@
-// g++ -std=c++14 -O2 -march=native -o play satsolv.cpp
+// The class to hold sudokus
+
+#ifndef SUDOHOLD
+#define SUDOHOLD
 
 #include "helper.h"
 #include "Cond.h"
@@ -15,3 +18,5 @@ private:
     vector<Tribools> mSudos;
     vector<int> mTags;
 };
+
+#endif // SUDOHOLD

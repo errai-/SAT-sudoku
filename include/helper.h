@@ -42,4 +42,5 @@ struct Triplet {
     int v2;
     int v3;
 };
-#endif
+
+#endif // HELPER
