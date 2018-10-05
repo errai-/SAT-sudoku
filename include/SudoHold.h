@@ -7,7 +7,6 @@
 class SudoHold {
 public:
     SudoHold() {}
-    ~SudoHold() {}
 
     bool ReadSudos(string fname);
     bool SolveSudos();

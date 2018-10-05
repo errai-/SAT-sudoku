@@ -7,9 +7,9 @@
 
 class Cond {
 public:
-    Cond(const string &c) { mCond = c; mStat = mbe; mUnk = 100; if (!Parse()) mStat = fls; }
-    Cond(const Cond &c) { mCond = c.mCond; mStat = c.mStat; mUnk = c.mUnk; mTruths = c.mTruths; }
     ~Cond() {}
+    // Intended constructor use
+    Cond(const string &c) { mCond = c; mStat = mbe; mUnk = 100; if (!Parse()) mStat = fls; }
 
     void PrintCond() const { cout << mCond << " s:" << Status() << " u:" << Unknowns() << endl; }
     string &GetCond() { return mCond; }
@@ -18,7 +18,9 @@ public:
     const tribool Status() const { return mStat; }
     const int Unknowns() const { return mUnk; }
 private:
+    // Suppress default constructor
     Cond() {}
+
     bool Parse();
     tribool Eval(tribool c1, tribool c2, string delim) {
         if (delim=="V") {

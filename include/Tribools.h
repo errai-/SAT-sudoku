@@ -8,17 +8,7 @@
 
 class Tribools {
 public:
-    Tribools() {};
-    Tribools(const Tribools &tbs) {
-        mVals = tbs.mVals;
-        mConds = tbs.mConds;
-    }
-    ~Tribools() {};
-    Tribools& operator=(const Tribools& tbs) {
-        mVals = tbs.mVals;
-        mConds = tbs.mConds;
-        return *this;
-    }
+    Tribools() {}
 
     vector<tribool> mVals;
     vector<Cond> mConds;
