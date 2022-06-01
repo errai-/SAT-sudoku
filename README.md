@@ -1,5 +1,6 @@
 A SAT solver to solve a sudoku, inspired by the Project Euler problem 96.
 Here, we get a set of 50 sudokus to solve. Some easier, some harder.
+This is a more evolved revision of the earlier 'sudoku-' repo.
 
 Since the parsing of general boolean conditions is a huge effort, a simpler methodology
 is provided here. The problem is to be fed an array of conditions that
